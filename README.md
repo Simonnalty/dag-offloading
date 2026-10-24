@@ -13,17 +13,22 @@
 | `algo_b_greedy.py` | **算法B** 贪心卸载 —— 每任务独立选代价最小层，短视但快 |
 | `algo_c_heft.py` | **算法C** HEFT 列表调度 —— 质量标杆（Topcuoglu et al., 2002） |
 | `algo_e_eheft.py` | **算法E** E-HEFT —— 本组自设计：时间-能耗加权选层，α=1 时严格等价于 HEFT，α 扫描产出 Pareto 曲线 |
-| `algo_d_dqn.py` | **算法D** DQN 强化学习 —— 环境逐步复刻仿真器时序（已验证一致），MLP+经验回放+目标网络；`dqn_offload(dag)` 加载权重输出决策 |
-| `algo_d_dqn_weights.pth` | DQN 训练好的权重（多种子选优后的最优一组） |
-| `experiments/train_variant.py` | 多种子训练辅助脚本（`python experiments/train_variant.py <seed>`） |
+| `algo_d_dqn.py` | **算法D** DQN 强化学习 —— 静态(13维状态)与动态(14维,含当前带宽)两种环境，环境时序与仿真器逐行一致（已验证） |
+| `algo_d_dqn_weights.pth` / `algo_d_dqn_dynamic.pth` | 静态/动态 DQN 训练好的权重（多种子选优） |
+| `experiments/train_variant.py` / `train_dynamic.py` | 多种子训练辅助脚本 |
 | `experiments/run_matrix.py` | 批量实验运行器：算法 × 规模 × 带宽场景 × seed 的矩阵，输出 `results.csv` 与汇总表 |
 | `experiments/results.csv` | 全量实验数据（`python experiments/run_matrix.py` 重新生成） |
 | `experiments/alpha_sweep.py` | E-HEFT 的 α 细扫实验（Pareto 曲线数据来源） |
+| `experiments/sensitivity.py` | 敏感性分析：带宽扫描 + λ 权重扫描 |
+| `experiments/shape_exp.py` | DAG 形状实验：深链式 vs 宽扇入 vs 随机 |
+| `experiments/dynamic_exp.py` | 动态带宽环境对比：静态算法 vs DQN 动态策略 |
 | `experiments/plots.py` | 图表生成：从 CSV 一键产出 `figures/` 下全部报告用图 |
-| `figures/` | 报告用图 6 张（时延/能耗对比、Pareto、DQN 收敛与泛化、决策开销） |
+| `figures/` | 报告用图 10 张（对比/Pareto/DQN/敏感性/形状/动态） |
+| `run_all.sh` | 一键复现：校准→矩阵→α扫→敏感性→形状→出图 |
 | `docs/complexity.md` | 五种算法的复杂度推导与实测印证 |
 | `docs/scenarios.md` | 应用场景调研（课题要求 3）：视频分析/AR-VR/工业IoT/车联网 |
 | `docs/defense_qa.md` | 答辩预期提问与标准回答 |
+| `docs/contribution.md` | 小组分工与贡献说明表 |
 | `docs/report_draft.md` | 课程设计报告初稿（全章节，数据已填入） |
 
 ## 环境

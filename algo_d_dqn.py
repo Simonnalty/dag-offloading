@@ -28,26 +28,53 @@ import torch
 import torch.nn as nn
 
 from dag_simulator import (NODES, topo_order, rank_upward,
-                           transfer_time, VALID_LOC as LOCS)
+                           transfer_time, transfer_duration,
+                           VALID_LOC as LOCS)
 
 P_TX = 1.2
-INPUT_DIM = 13
+INPUT_DIM = 13          # 静态环境状态维度
+DYN_INPUT_DIM = 14      # 动态环境: 额外一维"当前带宽缩放"(归一化)
 N_ACTIONS = 3
 WEIGHTS_PATH = Path(__file__).resolve().parent / "algo_d_dqn_weights.pth"
+DYN_WEIGHTS_PATH = Path(__file__).resolve().parent / "algo_d_dqn_dynamic.pth"
+
+
+def scale_at(phases, t):
+    """查询时刻 t 的带宽缩放(取 t_start <= t 的最后一段)"""
+    cur = phases[0][1]
+    for t_start, s in phases:
+        if t_start <= t:
+            cur = s
+        else:
+            break
+    return cur
 
 
 # ================= 1. 环境: 逐步复刻 simulate 的时序模型 =================
 class DAGOffloadEnv:
-    """把一个 DAG 的卸载决策过程封装成 MDP。"""
+    """
+    把一个 DAG 的卸载决策过程封装成 MDP。
+    phases=None 时为静态环境(与 simulate 一致, 13 维状态);
+    提供 phases 时为时变带宽环境(时序与 simulate_dynamic 一致, 14 维状态,
+    额外特征为决策时刻的带宽缩放), 策略可在线感知波动并自适应。
+    """
 
-    def __init__(self, dag, lam=0.5):
+    def __init__(self, dag, lam=0.5, phases=None):
         self.dag = dag
         self.lam = lam
+        self.phases = phases
         self.order = topo_order(dag, priority=rank_upward(dag))
         self.t_ref = sum(dag["workload"].values()) / NODES["end"]["f"]
         self.e_ref = NODES["end"]["p_exec"] * self.t_ref
         self.w_max = max(dag["workload"].values())
         self.n = dag["n"]
+        self.state_dim = INPUT_DIM + (1 if phases else 0)
+
+    def _tt(self, t0, size, src, dst):
+        """传输时长: 静态用 transfer_time, 动态按带宽调度逐段积分"""
+        if self.phases is None:
+            return transfer_time(src, dst, size)
+        return transfer_duration(t0, size, src, dst, self.phases)
 
     def reset(self):
         self.finish = {}
@@ -74,16 +101,23 @@ class DAGOffloadEnv:
         for k in LOCS:
             ready = 0.0
             if d_in > 0 and k != "end":
-                ready = transfer_time("end", k, d_in)
+                ready = transfer_time("end", k, d_in) if self.phases is None \
+                    else self._tt(0.0, d_in, "end", k)
             for p in preds:
-                tt = transfer_time(self.decision.get(p), k, dag["data_size"][(p, i)])
+                tt = self._tt(self.finish[p], dag["data_size"][(p, i)],
+                              self.decision.get(p), k) if self.phases is not None \
+                    else transfer_time(self.decision.get(p), k, dag["data_size"][(p, i)])
                 ready = max(ready, self.finish[p] + tt)
             frac = (sum(1 for p in preds if self.decision.get(p) == k) / len(preds)
                     if preds else 0.0)
             layer_feats += [ready / self.t_ref,
                             self.node_free[k] / self.t_ref,
                             frac]
-        return f + layer_feats
+        base = f + layer_feats
+        if self.phases is not None:
+            t_now = max(self.node_free.values())
+            base.append(scale_at(self.phases, t_now) / 1.5)   # 归一化到 ~[0.33,1]
+        return base
 
     def step(self, action):
         """action∈{0,1,2} → 端/边/云。返回 (下一状态, 奖励, 是否结束, 信息)"""
@@ -91,15 +125,15 @@ class DAGOffloadEnv:
         k = LOCS[action]
         dag = self.dag
 
-        # --- 时序推演: 与 simulate() 逐行一致 ---
+        # --- 时序推演: 与 simulate/simulate_dynamic 逐行一致 ---
         ready = 0.0
         d_in = dag.get("input_data", {}).get(i, 0.0)
         if d_in > 0 and k != "end":
-            tt = transfer_time("end", k, d_in)
+            tt = self._tt(0.0, d_in, "end", k)
             self.end_tx += tt
             ready = max(ready, tt)
         for p in dag["pred"].get(i, []):
-            tt = transfer_time(self.decision[p], k, dag["data_size"][(p, i)])
+            tt = self._tt(self.finish[p], dag["data_size"][(p, i)], self.decision[p], k)
             if "end" in (self.decision[p], k):
                 self.end_tx += tt
             ready = max(ready, self.finish[p] + tt)
@@ -112,7 +146,7 @@ class DAGOffloadEnv:
         done_time = exec_fin
         d_out = dag.get("output_data", {}).get(i, 0.0)
         if d_out > 0 and k != "end":
-            tt = transfer_time(k, "end", d_out)
+            tt = self._tt(exec_fin, d_out, k, "end")
             self.end_tx += tt
             done_time += tt
         self.finish[i] = done_time
@@ -132,10 +166,10 @@ class DAGOffloadEnv:
 
 # ================= 2. DQN 网络 / 经验回放 =================
 class QNet(nn.Module):
-    def __init__(self, hidden=64):
+    def __init__(self, hidden=64, input_dim=INPUT_DIM):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(INPUT_DIM, hidden), nn.ReLU(),
+            nn.Linear(input_dim, hidden), nn.ReLU(),
             nn.Linear(hidden, hidden), nn.ReLU(),
             nn.Linear(hidden, N_ACTIONS),
         )
@@ -163,14 +197,18 @@ class ReplayBuffer:
 
 # ================= 3. 训练 =================
 def train(episodes=3000, lam=0.5, dag_n=12, seed=0,
-          eps_decay_until=1800, target_sync=300, log_every=500):
+          eps_decay_until=1800, target_sync=300, log_every=500,
+          env_factory=None, input_dim=None, tag="DQN"):
     """
     在随机小 DAG 上训练 DQN。返回训练好的 Q 网络。
-    每 250 个 episode 在固定评估集上输出与 HEFT 的对比。
+    env_factory: dag -> DAGOffloadEnv 的工厂; 传入动态环境工厂即训练动态策略。
+    每 500 个 episode 在固定评估集上输出与 HEFT 的对比。
     """
     random.seed(seed)
     torch.manual_seed(seed)
-    policy_net, target_net = QNet(), QNet()
+    dim = input_dim or INPUT_DIM
+    mk_env = env_factory or (lambda d: DAGOffloadEnv(d, lam))
+    policy_net, target_net = QNet(input_dim=dim), QNet(input_dim=dim)
     target_net.load_state_dict(policy_net.state_dict())
     opt = torch.optim.Adam(policy_net.parameters(), lr=1e-3)
     buf = ReplayBuffer()
@@ -184,7 +222,7 @@ def train(episodes=3000, lam=0.5, dag_n=12, seed=0,
         objs = []
         with torch.no_grad():
             for dag in eval_dags:
-                env = DAGOffloadEnv(dag, lam)
+                env = mk_env(dag)
                 s = env.reset()
                 done = False
                 while not done:
@@ -200,7 +238,7 @@ def train(episodes=3000, lam=0.5, dag_n=12, seed=0,
         # 注: 曾试验混合规模(n 8~28)训练, 泛化反而显著变差(bootstrap 链过长、
         # 方差过大), 小图(n≈10-14)训练的策略向 n=30 泛化最好——实验记录见报告。
         dag = gen_dag_safe(dag_n + random.randint(-2, 2), random.randrange(10**6))
-        env = DAGOffloadEnv(dag, lam)
+        env = mk_env(dag)
         s = env.reset()
         done = False
         while not done:
@@ -239,10 +277,10 @@ def train(episodes=3000, lam=0.5, dag_n=12, seed=0,
 
         if (ep + 1) % log_every == 0 or ep == 0:
             if heft_obj is None:
-                heft_obj = _heft_objective(eval_dags, lam)
+                heft_obj = _heft_objective(eval_dags, lam, env_factory)
             obj = eval_net(policy_net)
-            print(f"  episode {ep+1:>5}/{episodes}  ε={eps:.2f}  "
-                  f"DQN加权目标={obj:.3f}  (HEFT={heft_obj:.3f}, 越小越好)")
+            print(f"  [{tag}] episode {ep+1:>5}/{episodes}  ε={eps:.2f}  "
+                  f"DQN加权目标={obj:.3f}  (HEFT={heft_obj:.3f}, 越小越好)", flush=True)
 
     return policy_net
 
@@ -253,11 +291,12 @@ def gen_dag_safe(n, seed):
     return gen_dag(n=n, p_edge=0.25, seed=seed)
 
 
-def _heft_objective(eval_dags, lam):
+def _heft_objective(eval_dags, lam, env_factory=None):
     from algo_c_heft import heft
+    mk_env = env_factory or (lambda d: DAGOffloadEnv(d, lam))
     objs = []
     for dag in eval_dags:
-        env = DAGOffloadEnv(dag, lam)
+        env = mk_env(dag)
         env.reset()
         done = False
         while not done:
@@ -265,6 +304,15 @@ def _heft_objective(eval_dags, lam):
             _, r, done, _ = env.step(a)
         objs.append(-r)
     return sum(objs) / len(objs)
+
+
+def make_random_schedule(rng, period_choices=(2.0, 4.0, 6.0),
+                         scale_choices=(0.5, 1.0, 1.5), horizon=120.0):
+    """为动态环境训练/评估生成随机带宽调度(周期与各段缩放均随机)"""
+    from dag_simulator import make_telegraph_phases
+    period = rng.choice(period_choices)
+    scales = [rng.choice(scale_choices) for _ in range(rng.randint(2, 4))]
+    return make_telegraph_phases(period, scales, horizon)
 
 
 def heft_action(env):
@@ -302,6 +350,25 @@ def dqn_offload(dag, net=None, lam=0.5):
     return dict(env.decision)
 
 
+def dqn_dynamic_offload(dag, phases, net=None, lam=0.5):
+    """
+    动态环境推理: 策略在每一步观测当前带宽缩放(状态第 14 维), 在线自适应决策。
+    net 为 None 时加载已保存的动态权重(algo_d_dqn_dynamic.pth)。
+    """
+    if net is None:
+        net = QNet(input_dim=DYN_INPUT_DIM)
+        net.load_state_dict(torch.load(DYN_WEIGHTS_PATH, map_location="cpu"))
+    net.eval()
+    env = DAGOffloadEnv(dag, lam, phases=phases)
+    s = env.reset()
+    done = False
+    with torch.no_grad():
+        while not done:
+            a = int(net(torch.tensor(s, dtype=torch.float32)).argmax())
+            s, _, done, _ = env.step(a)
+    return dict(env.decision)
+
+
 # ================= 5. 演示: 训练 + 与基线对比 =================
 if __name__ == "__main__":
     from dag_simulator import simulate
@@ -311,8 +378,8 @@ if __name__ == "__main__":
     from algo_e_eheft import eheft
 
     LAM = 0.5
-    print(f"训练 DQN (混合规模 n≈8-28, λ={LAM}, 约5-8分钟)...")
-    net = train(episodes=5000, lam=LAM, dag_n=18)
+    print(f"训练 DQN (小图 n≈10-14, λ={LAM}, 约4分钟)...")
+    net = train(episodes=3000, lam=LAM, dag_n=12)
     torch.save(net.state_dict(), WEIGHTS_PATH)
     print(f"权重已保存: {WEIGHTS_PATH.name}")
 

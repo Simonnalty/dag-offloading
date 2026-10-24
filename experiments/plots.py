@@ -215,6 +215,109 @@ def decision_time(rows):
     print("已生成 fig6_decision_time.png")
 
 
+def load_csv(name):
+    p = ROOT / "experiments" / name
+    if not p.exists():
+        return None
+    with open(p, encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def bandwidth_sweep():
+    """图7: 各算法时延随带宽缩放的变化"""
+    rows = load_csv("bw_sweep.csv")
+    if rows is None:
+        print("跳过 fig7 (无 bw_sweep.csv)"); return
+    scales = sorted({float(r["bw_scale"]) for r in rows}, reverse=True)
+    algos = ["all-edge", "all-cloud", "B-greedy", "C-HEFT", "E-EHEFT-0.5", "D-DQN"]
+    labels = ["全在边", "全在云", "B贪心", "C-HEFT", "E-EHEFT", "D-DQN"]
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    for algo, lab in zip(algos, labels):
+        ms = [next(float(r["makespan"]) for r in rows
+                   if r["algorithm"] == algo and float(r["bw_scale"]) == s)
+              for s in scales]
+        ax.plot(scales, ms, "o-", label=lab)
+    ax.set_xlabel("带宽缩放系数 (1.0=正常)")
+    ax.set_ylabel("平均总时延 (s)")
+    ax.set_title("敏感性分析: 传输能力对各算法的影响 (n=50)")
+    ax.legend(); ax.grid(alpha=0.3)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "fig7_bandwidth.png", dpi=200)
+    plt.close(fig); print("已生成 fig7_bandwidth.png")
+
+
+def lambda_sweep():
+    """图8: 不同能耗权重 λ 下的加权目标"""
+    rows = load_csv("lambda_sweep.csv")
+    if rows is None:
+        print("跳过 fig8 (无 lambda_sweep.csv)"); return
+    lams = sorted({float(r["lambda"]) for r in rows})
+    algos = ["all-edge", "all-cloud", "B-greedy", "C-HEFT", "E-EHEFT-0.5", "D-DQN"]
+    labels = ["全在边", "全在云", "B贪心", "C-HEFT", "E-EHEFT", "D-DQN"]
+    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    for algo, lab in zip(algos, labels):
+        obj = [next(float(r["weighted_obj"]) for r in rows
+                    if r["algorithm"] == algo and float(r["lambda"]) == l)
+               for l in lams]
+        ax.plot(lams, obj, "o-", label=lab)
+    ax.set_xlabel("能耗权重 λ")
+    ax.set_ylabel("加权目标 时延+λ·能耗 (越小越好)")
+    ax.set_title("敏感性分析: 业务偏好(λ)如何改变最优算法 (n=50)")
+    ax.legend(); ax.grid(alpha=0.3)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "fig8_lambda.png", dpi=200)
+    plt.close(fig); print("已生成 fig8_lambda.png")
+
+
+def shape_exp():
+    """图9: DAG 形状(深链式/宽扇入/随机)下的时延对比"""
+    rows = load_csv("shape_exp.csv")
+    if rows is None:
+        print("跳过 fig9 (无 shape_exp.csv)"); return
+    shapes = ["deep(20x3)", "wide(5x12)", "random(60)"]
+    shape_labels = ["深链式(20×3)", "宽扇入(5×12)", "随机(60节点)"]
+    algos = ["all-cloud", "B-greedy", "C-HEFT", "E-EHEFT-0.5", "D-DQN"]
+    algo_labels = ["全在云", "B贪心", "C-HEFT", "E-EHEFT", "D-DQN"]
+    width = 0.8 / len(algos)
+    fig, ax = plt.subplots(figsize=(9, 4.5))
+    for j, (algo, lab) in enumerate(zip(algos, algo_labels)):
+        xs = [i + j * width for i in range(len(shapes))]
+        ms = [next(float(r["makespan"]) for r in rows
+                   if r["algorithm"] == algo and r["shape"] == s)
+              for s in shapes]
+        ax.bar(xs, ms, width * 0.9, label=lab, color=plt.cm.viridis(0.15 + 0.14 * j))
+    ax.set_xticks([i + width * 2 for i in range(len(shapes))])
+    ax.set_xticklabels(shape_labels)
+    ax.set_ylabel("平均总时延 (s)")
+    ax.set_title("DAG 形状对算法表现的影响 (约60节点, 10 seeds)")
+    ax.legend(); ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "fig9_shape.png", dpi=200)
+    plt.close(fig); print("已生成 fig9_shape.png")
+
+
+def dynamic_exp():
+    """图10: 动态带宽环境下 静态算法 vs DQN 动态策略"""
+    rows = load_csv("dynamic_exp.csv")
+    if rows is None:
+        print("跳过 fig10 (无 dynamic_exp.csv)"); return
+    regimes = list(dict.fromkeys(r["regime"] for r in rows))
+    algos = ["all-edge", "all-cloud", "B-greedy", "C-HEFT", "E-EHEFT-0.5", "D-DQN-dynamic"]
+    algo_labels = ["全在边", "全在云", "B贪心", "C-HEFT", "E-EHEFT", "D-DQN(动态)"]
+    width = 0.8 / len(algos)
+    fig, ax = plt.subplots(figsize=(10, 4.5))
+    for j, (algo, lab) in enumerate(zip(algos, algo_labels)):
+        xs = [i + j * width for i in range(len(regimes))]
+        obj = [next(float(r["weighted"]) for r in rows
+                    if r["algorithm"] == algo and r["regime"] == reg)
+               for reg in regimes]
+        ax.bar(xs, obj, width * 0.9, label=lab, color=plt.cm.viridis(0.15 + 0.14 * j))
+    ax.set_xticks([i + width * 2.5 for i in range(len(regimes))])
+    ax.set_xticklabels(regimes, fontsize=8)
+    ax.set_ylabel("加权目标 时延+0.5·能耗 (越小越好)")
+    ax.set_title("动态带宽环境: 静态算法(决策时不知波动) vs DQN 动态策略 (n=30)")
+    ax.legend(fontsize=8); ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout(); fig.savefig(FIG_DIR / "fig10_dynamic.png", dpi=200)
+    plt.close(fig); print("已生成 fig10_dynamic.png")
+
+
 if __name__ == "__main__":
     rows = load_results()
     grouped_bars(rows, "makespan", "各算法总时延对比", "fig1_makespan.png")
@@ -223,4 +326,8 @@ if __name__ == "__main__":
     dqn_convergence()
     dqn_generalization(rows)
     decision_time(rows)
+    bandwidth_sweep()
+    lambda_sweep()
+    shape_exp()
+    dynamic_exp()
     print(f"\n全部图表输出目录: {FIG_DIR}")
