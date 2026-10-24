@@ -12,8 +12,10 @@
 | `algo_a_random.py` | **算法A** 随机卸载 —— baseline 下限 |
 | `algo_b_greedy.py` | **算法B** 贪心卸载 —— 每任务独立选代价最小层，短视但快 |
 | `algo_c_heft.py` | **算法C** HEFT 列表调度 —— 质量标杆（Topcuoglu et al., 2002） |
+| `algo_e_eheft.py` | **算法E** E-HEFT —— 本组自设计：时间-能耗加权选层，α=1 时严格等价于 HEFT，α 扫描产出 Pareto 曲线 |
 | `algo_d_dqn.py` | **算法D** DQN 强化学习 —— 待实现（RL 组） |
-| `experiments/` | 实验脚本与图表 —— 待建（实验组） |
+| `experiments/run_matrix.py` | 批量实验运行器：算法 × 规模 × 带宽场景 × seed 的矩阵，输出 `results.csv` 与汇总表 |
+| `experiments/results.csv` | 全量实验数据（540 条，`python experiments/run_matrix.py` 重新生成） |
 
 ## 环境
 
@@ -29,6 +31,11 @@ python verify_handcheck.py
 python algo_a_random.py
 python algo_b_greedy.py
 python algo_c_heft.py
+python algo_e_eheft.py        # α 扫描演示
+
+# 3. 批量实验(全量矩阵, 生成 results.csv 与汇总表)
+python experiments/run_matrix.py
+python experiments/run_matrix.py --quick   # 小矩阵冒烟测试
 ```
 
 自己写算法只需两步：
