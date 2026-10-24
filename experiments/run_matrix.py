@@ -28,6 +28,7 @@ from algo_a_random import random_offload
 from algo_b_greedy import greedy_offload
 from algo_c_heft import heft
 from algo_e_eheft import eheft
+from algo_d_dqn import dqn_offload
 
 # ---------------- 实验配置 ----------------
 ALGORITHMS = [
@@ -40,6 +41,7 @@ ALGORITHMS = [
     ("E-EHEFT-a0.75", lambda dag: eheft(dag, alpha=0.75)),
     ("E-EHEFT-a0.5",  lambda dag: eheft(dag, alpha=0.5)),
     ("E-EHEFT-a0.25", lambda dag: eheft(dag, alpha=0.25)),
+    ("D-DQN",         dqn_offload),   # 加载 algo_d_dqn_weights.pth 已训练权重
 ]
 N_SIZES = [20, 50, 100]
 BW_SCENES = {"normal": 1.0, "low": 0.5}   # 带宽场景: 正常 / 减半

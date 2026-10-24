@@ -13,13 +13,21 @@
 | `algo_b_greedy.py` | **算法B** 贪心卸载 —— 每任务独立选代价最小层，短视但快 |
 | `algo_c_heft.py` | **算法C** HEFT 列表调度 —— 质量标杆（Topcuoglu et al., 2002） |
 | `algo_e_eheft.py` | **算法E** E-HEFT —— 本组自设计：时间-能耗加权选层，α=1 时严格等价于 HEFT，α 扫描产出 Pareto 曲线 |
-| `algo_d_dqn.py` | **算法D** DQN 强化学习 —— 待实现（RL 组） |
+| `algo_d_dqn.py` | **算法D** DQN 强化学习 —— 环境逐步复刻仿真器时序（已验证一致），MLP+经验回放+目标网络；`dqn_offload(dag)` 加载权重输出决策 |
+| `algo_d_dqn_weights.pth` | DQN 训练好的权重（多种子选优后的最优一组） |
+| `experiments/train_variant.py` | 多种子训练辅助脚本（`python experiments/train_variant.py <seed>`） |
 | `experiments/run_matrix.py` | 批量实验运行器：算法 × 规模 × 带宽场景 × seed 的矩阵，输出 `results.csv` 与汇总表 |
-| `experiments/results.csv` | 全量实验数据（540 条，`python experiments/run_matrix.py` 重新生成） |
+| `experiments/results.csv` | 全量实验数据（`python experiments/run_matrix.py` 重新生成） |
 
 ## 环境
 
-Python 3.8+，无第三方依赖（DQN 实现时另加 PyTorch / NumPy）。
+Python 3.8+。基础功能无第三方依赖；运行 DQN 相关（`algo_d_dqn.py`、实验矩阵中的 D-DQN）需要：
+
+```bash
+pip install numpy torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+（CPU 版即可：策略网络只有约 5600 参数，GPU 无收益，瓶颈在环境仿真。）
 
 ## 快速开始
 
