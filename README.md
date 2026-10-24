@@ -18,6 +18,13 @@
 | `experiments/train_variant.py` | 多种子训练辅助脚本（`python experiments/train_variant.py <seed>`） |
 | `experiments/run_matrix.py` | 批量实验运行器：算法 × 规模 × 带宽场景 × seed 的矩阵，输出 `results.csv` 与汇总表 |
 | `experiments/results.csv` | 全量实验数据（`python experiments/run_matrix.py` 重新生成） |
+| `experiments/alpha_sweep.py` | E-HEFT 的 α 细扫实验（Pareto 曲线数据来源） |
+| `experiments/plots.py` | 图表生成：从 CSV 一键产出 `figures/` 下全部报告用图 |
+| `figures/` | 报告用图 6 张（时延/能耗对比、Pareto、DQN 收敛与泛化、决策开销） |
+| `docs/complexity.md` | 五种算法的复杂度推导与实测印证 |
+| `docs/scenarios.md` | 应用场景调研（课题要求 3）：视频分析/AR-VR/工业IoT/车联网 |
+| `docs/defense_qa.md` | 答辩预期提问与标准回答 |
+| `docs/report_draft.md` | 课程设计报告初稿（全章节，数据已填入） |
 
 ## 环境
 
