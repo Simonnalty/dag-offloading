@@ -42,18 +42,20 @@ def run_once():
 # ---- Part A: 带宽扫描(原地改共享 BANDWIDTH 字典, 结束恢复) ----
 ORIG = dict(dag_simulator.BANDWIDTH)
 rows_a = []
-for scale in (1.0, 0.7, 0.5, 0.3):
+try:
+    for scale in (1.0, 0.7, 0.5, 0.3):
+        for k in dag_simulator.BANDWIDTH:
+            dag_simulator.BANDWIDTH[k] = ORIG[k] * scale
+        res = run_once()
+        for name, runs in res.items():
+            ms = sum(x[0] for x in runs) / SEEDS
+            en = sum(x[1] for x in runs) / SEEDS
+            rows_a.append({"bw_scale": scale, "algorithm": name,
+                           "makespan": round(ms, 4), "energy": round(en, 4)})
+        print(f"带宽×{scale}: " + "  ".join(f"{n}={sum(x[0] for x in res[n])/SEEDS:.2f}s" for n, _ in ALGOS))
+finally:
     for k in dag_simulator.BANDWIDTH:
-        dag_simulator.BANDWIDTH[k] = ORIG[k] * scale
-    res = run_once()
-    for name, runs in res.items():
-        ms = sum(x[0] for x in runs) / SEEDS
-        en = sum(x[1] for x in runs) / SEEDS
-        rows_a.append({"bw_scale": scale, "algorithm": name,
-                       "makespan": round(ms, 4), "energy": round(en, 4)})
-    print(f"带宽×{scale}: " + "  ".join(f"{n}={sum(x[0] for x in res[n])/SEEDS:.2f}s" for n, _ in ALGOS))
-for k in dag_simulator.BANDWIDTH:
-    dag_simulator.BANDWIDTH[k] = ORIG[k]
+        dag_simulator.BANDWIDTH[k] = ORIG[k]
 
 with open(ROOT / "experiments" / "bw_sweep.csv", "w", newline="", encoding="utf-8") as f:
     w = csv.DictWriter(f, fieldnames=["bw_scale", "algorithm", "makespan", "energy"])

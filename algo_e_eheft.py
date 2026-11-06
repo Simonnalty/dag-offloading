@@ -26,7 +26,7 @@
 负责人: (填组员名字)
 """
 
-from dag_simulator import NODES, topo_order, rank_upward
+from dag_simulator import NODES, topo_order, rank_upward, P_TX_END as P_TX
 from algo_c_heft import _transfer, _ready_time, LOCS
 
 
@@ -71,9 +71,6 @@ def eheft(dag, alpha=0.5):
         finish[i] = done
         node_free[best] = exec_fin
     return decision
-
-
-P_TX = 1.2  # 与 dag_simulator.P_TX_END 保持一致
 
 
 if __name__ == "__main__":

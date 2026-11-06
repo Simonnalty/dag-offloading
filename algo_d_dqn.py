@@ -22,6 +22,7 @@
 """
 
 import random
+from functools import lru_cache
 from pathlib import Path
 
 import torch
@@ -334,11 +335,25 @@ def heft_action(env):
 
 
 # ================= 4. 推理: 用训练好的网络输出卸载决策 =================
+@lru_cache(maxsize=4)
+def _load_net(path, input_dim):
+    """
+    加载并缓存权重。批量实验里每个 DAG 都 torch.load 一次会白耗 ~1.6ms/次,
+    且会把这部分读盘时间算进"决策耗时", 对 DQN 不公平。
+    """
+    net = QNet(input_dim=input_dim)
+    net.load_state_dict(torch.load(path, map_location="cpu"))
+    net.eval()
+    return net
+
+
 def dqn_offload(dag, net=None, lam=0.5):
-    """输入 dag, 返回 {task_id: 层}。net 为 None 时加载已保存的权重。"""
+    """
+    输入 dag, 返回 {task_id: 层}。net 为 None 时加载并缓存已保存的权重。
+    注意: lam 只用于与训练奖励口径保持一致, 推理阶段 argmax Q 不依赖它。
+    """
     if net is None:
-        net = QNet()
-        net.load_state_dict(torch.load(WEIGHTS_PATH, map_location="cpu"))
+        net = _load_net(str(WEIGHTS_PATH), INPUT_DIM)
     net.eval()
     env = DAGOffloadEnv(dag, lam)
     s = env.reset()
@@ -353,11 +368,10 @@ def dqn_offload(dag, net=None, lam=0.5):
 def dqn_dynamic_offload(dag, phases, net=None, lam=0.5):
     """
     动态环境推理: 策略在每一步观测当前带宽缩放(状态第 14 维), 在线自适应决策。
-    net 为 None 时加载已保存的动态权重(algo_d_dqn_dynamic.pth)。
+    net 为 None 时加载并缓存已保存的动态权重(algo_d_dqn_dynamic.pth)。
     """
     if net is None:
-        net = QNet(input_dim=DYN_INPUT_DIM)
-        net.load_state_dict(torch.load(DYN_WEIGHTS_PATH, map_location="cpu"))
+        net = _load_net(str(DYN_WEIGHTS_PATH), DYN_INPUT_DIM)
     net.eval()
     env = DAGOffloadEnv(dag, lam, phases=phases)
     s = env.reset()

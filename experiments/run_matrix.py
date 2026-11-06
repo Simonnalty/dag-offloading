@@ -62,23 +62,25 @@ def set_bw_scale(scale):
 
 def run_matrix(n_sizes, seeds, bw_scenes):
     rows = []
-    for bw_name, scale in bw_scenes.items():
-        set_bw_scale(scale)
-        for n in n_sizes:
-            for seed in seeds:
-                dag = gen_dag(n=n, p_edge=P_EDGE, seed=seed)
-                for algo_name, algo_fn in ALGORITHMS:
-                    t0 = time.perf_counter()
-                    decision = algo_fn(dag)
-                    decision_ms = (time.perf_counter() - t0) * 1000
-                    r = simulate(dag, decision)
-                    rows.append({
-                        "bw": bw_name, "n": n, "seed": seed,
-                        "algorithm": algo_name,
-                        "makespan": r["makespan"], "energy": r["energy"],
-                        "decision_ms": round(decision_ms, 3),
-                    })
-        set_bw_scale(1.0)   # 恢复, 防止污染后续实验
+    try:
+        for bw_name, scale in bw_scenes.items():
+            set_bw_scale(scale)
+            for n in n_sizes:
+                for seed in seeds:
+                    dag = gen_dag(n=n, p_edge=P_EDGE, seed=seed)
+                    for algo_name, algo_fn in ALGORITHMS:
+                        t0 = time.perf_counter()
+                        decision = algo_fn(dag)
+                        decision_ms = (time.perf_counter() - t0) * 1000
+                        r = simulate(dag, decision)
+                        rows.append({
+                            "bw": bw_name, "n": n, "seed": seed,
+                            "algorithm": algo_name,
+                            "makespan": r["makespan"], "energy": r["energy"],
+                            "decision_ms": round(decision_ms, 3),
+                        })
+    finally:
+        set_bw_scale(1.0)   # 无论是否异常都恢复, 防止污染后续实验
     return rows
 
 
