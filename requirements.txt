@@ -1,0 +1,6 @@
+# DQN (algo_d_dqn.py, D-DQN in experiments/run_matrix.py)
+# CPU build is enough: the Q-network has only ~5.6k parameters.
+torch>=2.0
+
+# Plotting (experiments/plots.py)
+matplotlib>=3.5

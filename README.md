@@ -33,13 +33,15 @@
 
 ## 环境
 
-Python 3.8+。基础功能无第三方依赖；运行 DQN 相关（`algo_d_dqn.py`、实验矩阵中的 D-DQN）需要：
+Python 3.8+。仿真器与传统算法只用标准库；运行 DQN 与绘图需要额外依赖：
 
 ```bash
-pip install numpy torch --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
 ```
 
-（CPU 版即可：策略网络只有约 5600 参数，GPU 无收益，瓶颈在环境仿真。）
+（CPU 版 torch 即可：策略网络只有约 5600 参数，GPU 无收益，瓶颈在环境仿真。
+只跑传统算法时无需 torch；但 `experiments/run_matrix.py` 会在顶层 import DQN，
+所以批量实验仍需装齐依赖。）
 
 ## 快速开始
 

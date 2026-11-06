@@ -4,6 +4,16 @@
 构造一个 2 节点小 DAG, 所有数值均可纸上手算, 与 simulate() 输出逐一核对。
 全组评审时用这个文件证明仿真器是正确的。
 """
+import sys
+
+# Windows 默认 GBK 控制台无法编码文末的 ✓/✗, 会让这个校准脚本自己抛
+# UnicodeEncodeError(退出码 1)。这里把不可编码字符替换成 '?', 保证
+# 校验结论在任意终端都能正常打印出来。
+try:
+    sys.stdout.reconfigure(errors="replace")
+except AttributeError:      # Python < 3.7
+    pass
+
 from dag_simulator import simulate
 
 # 手工算例: 任务0 (计算量100 MI, 产出1MB) -> 任务1 (计算量200 MI)
