@@ -8,7 +8,7 @@
   控制台汇总表(均值±标准差、makespan最优次数)
 
 用法:
-  python experiments/run_matrix.py           # 全量矩阵(约1分钟)
+  python experiments/run_matrix.py           # 全量矩阵(通常几秒, 视机器而定)
   python experiments/run_matrix.py --quick   # 冒烟测试(小矩阵)
 """
 

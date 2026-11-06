@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 一键复现全部实验数据与图表 (答辩演示用)
-# 用法: bash run_all.sh    (在仓库根目录执行, 约 15 分钟, 其中 DQN 静态训练约 4 分钟)
+# 用法: bash run_all.sh    (在仓库根目录执行; 不包含 DQN 训练, 全流程通常数十秒)
 set -e
 cd "$(dirname "$0")"
 
