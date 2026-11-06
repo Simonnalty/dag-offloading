@@ -25,6 +25,7 @@
 | `experiments/plots.py` | 图表生成：从 CSV 一键产出 `figures/` 下全部报告用图 |
 | `figures/` | 报告用图 10 张（对比/Pareto/DQN/敏感性/形状/动态） |
 | `run_all.sh` | 一键复现：校准→矩阵→α扫→敏感性→形状→出图 |
+| `run_all.py` | 同上的跨平台版（Windows 等无 bash 环境用，支持 `--skip-plots`） |
 | `docs/complexity.md` | 五种算法的复杂度推导与实测印证 |
 | `docs/scenarios.md` | 应用场景调研（课题要求 3）：视频分析/AR-VR/工业IoT/车联网 |
 | `docs/defense_qa.md` | 答辩预期提问与标准回答 |
@@ -58,6 +59,13 @@ python algo_e_eheft.py        # α 扫描演示
 # 3. 批量实验(全量矩阵, 生成 results.csv 与汇总表)
 python experiments/run_matrix.py
 python experiments/run_matrix.py --quick   # 小矩阵冒烟测试
+```
+
+一键复现全部数据与图表（含 Windows 等无 bash 环境）：
+
+```bash
+python run_all.py              # 校准 → 矩阵 → α 扫 → 敏感性 → 形状 → 出图
+python run_all.py --skip-plots # 没装 matplotlib 时跳过绘图
 ```
 
 自己写算法只需两步：
