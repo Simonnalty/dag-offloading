@@ -1,0 +1,31 @@
+name: handcheck
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Simulator hand-check
+        run: python verify_handcheck.py
+
+      - name: Traditional algorithms smoke test
+        run: |
+          python algo_a_random.py
+          python algo_b_greedy.py
+          python algo_c_heft.py
+          python algo_e_eheft.py
