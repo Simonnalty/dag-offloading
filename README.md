@@ -14,16 +14,20 @@
 | `algo_c_heft.py` | **算法C** HEFT 列表调度 —— 质量标杆（Topcuoglu et al., 2002） |
 | `algo_e_eheft.py` | **算法E** E-HEFT —— 本组自设计：时间-能耗加权选层，α=1 时严格等价于 HEFT，α 扫描产出 Pareto 曲线 |
 | `algo_d_dqn.py` | **算法D** DQN 强化学习 —— 静态(13维状态)与动态(14维,含当前带宽)两种环境，环境时序与仿真器逐行一致（已验证） |
+| `algo_f_exact.py` | **精确最优基准（标尺）** —— n≤12 时穷举 3^n 个决策，给出真实 Pareto 前沿与加权最优，量化各算法离最优的差距 |
+| `verify_exact.py` | 精确基准自检：与 `simulate()` 对拍、前沿性质、暴力枚举交叉验证（改仿真器后与 `verify_handcheck.py` 一起跑） |
 | `algo_d_dqn_weights.pth` / `algo_d_dqn_dynamic.pth` | 静态/动态 DQN 训练好的权重（多种子选优） |
 | `experiments/train_variant.py` / `train_dynamic.py` | 多种子训练辅助脚本 |
 | `experiments/run_matrix.py` | 批量实验运行器：算法 × 规模 × 带宽场景 × seed 的矩阵，输出 `results.csv` 与汇总表 |
 | `experiments/results.csv` | 全量实验数据（`python experiments/run_matrix.py` 重新生成） |
+| `experiments/optimality_gap.py` | 最优性差距实验：小规模精确最优 vs 各算法，输出 `optimality_gap.csv` / `pareto_front.csv` 等 |
+| `experiments/plot_optimality.py` | 图 11 生成：各算法差距条形图 + 最差实例的 Pareto 前沿与算法落点 |
 | `experiments/alpha_sweep.py` | E-HEFT 的 α 细扫实验（Pareto 曲线数据来源） |
 | `experiments/sensitivity.py` | 敏感性分析：带宽扫描 + λ 权重扫描 |
 | `experiments/shape_exp.py` | DAG 形状实验：深链式 vs 宽扇入 vs 随机 |
 | `experiments/dynamic_exp.py` | 动态带宽环境对比：静态算法 vs DQN 动态策略 |
 | `experiments/plots.py` | 图表生成：从 CSV 一键产出 `figures/` 下全部报告用图 |
-| `figures/` | 报告用图 10 张（对比/Pareto/DQN/敏感性/形状/动态） |
+| `figures/` | 报告用图 10 张（对比/Pareto/DQN/敏感性/形状/动态）+ 最优性基准图 1 张 |
 | `run_all.sh` | 一键复现：校准→矩阵→α扫→敏感性→形状→出图 |
 | `run_all.py` | 同上的跨平台版（Windows 等无 bash 环境用，支持 `--skip-plots`） |
 | `docs/complexity.md` | 五种算法的复杂度推导与实测印证 |
@@ -31,6 +35,7 @@
 | `docs/defense_qa.md` | 答辩预期提问与标准回答 |
 | `docs/contribution.md` | 小组分工与贡献说明表 |
 | `docs/report_draft.md` | 课程设计报告初稿（全章节，数据已填入） |
+| `docs/optimality.md` | 精确最优基准：定义、正确性、小规模结果与"启发式离最优多远"的分析 |
 
 ## 环境
 
@@ -59,6 +64,11 @@ python algo_e_eheft.py        # α 扫描演示
 # 3. 批量实验(全量矩阵, 生成 results.csv 与汇总表)
 python experiments/run_matrix.py
 python experiments/run_matrix.py --quick   # 小矩阵冒烟测试
+
+# 4. 精确最优基准（可选，n≤12，约 33 秒；先自检再出图）
+python verify_exact.py
+python experiments/optimality_gap.py          # 加 --quick 只跑 n=8、3 seeds
+python experiments/plot_optimality.py         # 生成 figures/fig11_optimality_gap.png
 ```
 
 一键复现全部数据与图表（含 Windows 等无 bash 环境）：
